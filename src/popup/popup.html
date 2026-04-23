@@ -11,20 +11,24 @@
   <!-- ── Header ── -->
   <header class="header">
     <div class="logo">Saved<span>In</span></div>
-    <button
-      class="sync-btn"
-      id="syncBtn"
-      data-tooltip="Sync from LinkedIn"
-      aria-label="Sync from LinkedIn"
-    >
-      <!-- Refresh / sync icon -->
-      <svg id="syncIcon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"/>
-        <polyline points="1 20 1 14 7 14"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-    </button>
+    <div class="header-actions">
+      <!-- Shown only while syncing -->
+      <button class="cancel-btn" id="cancelBtn" aria-label="Cancel sync">Cancel</button>
+      <!-- Sync icon button -->
+      <button
+        class="sync-btn"
+        id="syncBtn"
+        data-tooltip="Sync from LinkedIn"
+        aria-label="Sync from LinkedIn"
+      >
+        <svg id="syncIcon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <!-- ── Search ── -->
@@ -44,6 +48,9 @@
     <span class="post-count" id="postCount"></span>
     <span class="status-msg" id="statusMsg"></span>
   </div>
+
+  <!-- Shown only while syncing — reminds the user to stay on the LinkedIn tab -->
+  <div class="sync-hint" id="syncHint">Stay on the LinkedIn tab</div>
 
   <!-- ── Results ── -->
   <div class="results" id="results">

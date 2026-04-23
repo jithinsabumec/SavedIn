@@ -12,9 +12,12 @@ const emptyState  = document.getElementById('emptyState');
 const postCount   = document.getElementById('postCount');
 const statusMsg   = document.getElementById('statusMsg');
 const syncBtn     = document.getElementById('syncBtn');
+const cancelBtn   = document.getElementById('cancelBtn');
+const syncHint    = document.getElementById('syncHint');
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let allPosts = [];
+let allPosts       = [];
+let activeSyncTabId = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -39,19 +42,12 @@ async function loadPosts() {
  * Case-insensitive substring search across postText and authorName.
  * Returns results with the exact byte ranges of every match in postText,
  * so highlights are always the complete query phrase — never scattered tokens.
- *
- * @param {string} query
- * @param {object[]} posts
- * @returns {{ item: object, ranges: [number, number][] }[]}
  */
 function searchPosts(query, posts) {
   const q = query.trim();
+  if (!q) return posts.map((p) => ({ item: p, ranges: [] }));
 
-  if (!q) {
-    return posts.map((p) => ({ item: p, ranges: [] }));
-  }
-
-  const qLower = q.toLowerCase();
+  const qLower  = q.toLowerCase();
   const matched = [];
 
   for (const post of posts) {
@@ -60,15 +56,13 @@ function searchPosts(query, posts) {
 
     const textMatch   = textLower.includes(qLower);
     const authorMatch = authorLower.includes(qLower);
-
     if (!textMatch && !authorMatch) continue;
 
-    // Collect every occurrence of the query inside postText (for highlighting)
     const ranges = [];
     if (textMatch) {
       let idx = 0;
       while ((idx = textLower.indexOf(qLower, idx)) !== -1) {
-        ranges.push([idx, idx + q.length - 1]); // inclusive end
+        ranges.push([idx, idx + q.length - 1]);
         idx += q.length;
       }
     }
@@ -96,7 +90,7 @@ function renderResults(items) {
 
   if (count === 0) {
     emptyState.classList.add('show');
-    emptyState.querySelector('p').textContent     = allPosts.length === 0 ? 'No posts synced yet'              : 'No posts found';
+    emptyState.querySelector('p').textContent     = allPosts.length === 0 ? 'No posts synced yet'                          : 'No posts found';
     emptyState.querySelector('.hint').textContent = allPosts.length === 0 ? 'Click the sync button to import from LinkedIn' : 'Try a different search term';
     return;
   }
@@ -107,8 +101,7 @@ function renderResults(items) {
 
   for (const { item: post, ranges } of items) {
     const preview = buildHighlightedPreview(post.postText, ranges);
-
-    const card = document.createElement('div');
+    const card    = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="card-header">
@@ -127,33 +120,23 @@ function renderResults(items) {
 /**
  * Returns an HTML snippet centred around the first match so the highlighted
  * term is always visible, even when it appears deep in a long post.
- *
- * When there are no matches (empty query / show-all mode) it falls back to
- * the opening 300 characters of the post.
- *
- * @param {string} text                full post text
- * @param {[number, number][]} ranges  inclusive [start, end] pairs from searchPosts()
  */
 function buildHighlightedPreview(text, ranges) {
-  const WINDOW = 300; // total characters to show
-  const PAD    = 80;  // characters of context to show before the first match
+  const WINDOW = 300;
+  const PAD    = 80;
 
   if (!ranges || ranges.length === 0) {
-    // No search active — show the opening of the post
     const preview = text.slice(0, WINDOW) + (text.length > WINDOW ? '…' : '');
     return escapeHtml(preview);
   }
 
-  // Centre the window on the first match
-  const [firstStart] = ranges[0];
-  const winStart = Math.max(0, firstStart - PAD);
-  const winEnd   = winStart + WINDOW;
+  const [firstStart]   = ranges[0];
+  const winStart       = Math.max(0, firstStart - PAD);
+  const winEnd         = winStart + WINDOW;
+  const excerpt        = text.slice(winStart, winEnd);
+  const leadEllipsis   = winStart > 0;
+  const trailEllipsis  = winEnd < text.length;
 
-  const excerpt    = text.slice(winStart, winEnd);
-  const leadEllipsis  = winStart > 0;
-  const trailEllipsis = winEnd < text.length;
-
-  // Translate absolute ranges into excerpt-local offsets, drop out-of-window ones
   const local = ranges
     .map(([s, e]) => [s - winStart, e - winStart])
     .filter(([s, e]) => e >= 0 && s < excerpt.length)
@@ -193,29 +176,28 @@ syncBtn.addEventListener('click', async () => {
     return;
   }
 
+  activeSyncTabId = tab.id;
   setSyncing(true);
 
   try {
-    // Register listener BEFORE injecting — avoids missing a fast response.
-    const syncPromise = waitForSyncResult();
+    // Register listener BEFORE injecting — avoids missing a fast first partial.
+    const syncPromise = watchSyncProgress((partial) => {
+      showStatus(`Scrolling… ${partial.totalThisSession} posts found`, 'progress');
+    });
 
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ['content.js'],
+      files:  ['content.js'],
     });
 
     const result = await syncPromise;
 
-    if (result.warning) {
-      showStatus(result.warning, 'warning');
-    } else {
-      showStatus(
-        result.newCount === 0
-          ? 'Already up to date'
-          : `${result.newCount} new post${result.newCount !== 1 ? 's' : ''} added`,
-        'success',
-      );
-    }
+    showStatus(
+      result.totalThisSession === 0
+        ? 'Already up to date'
+        : `${result.totalThisSession} new post${result.totalThisSession !== 1 ? 's' : ''} added`,
+      'success',
+    );
 
     allPosts = await loadPosts();
     renderResults(searchPosts(searchInput.value, allPosts));
@@ -224,28 +206,47 @@ syncBtn.addEventListener('click', async () => {
     showStatus('Sync failed — check the console', 'error');
   } finally {
     setSyncing(false);
+    activeSyncTabId = null;
+  }
+});
+
+// Cancel button — sends CANCEL_SYNC to the content script on the LinkedIn tab
+cancelBtn.addEventListener('click', async () => {
+  if (!activeSyncTabId) return;
+  try {
+    await chrome.tabs.sendMessage(activeSyncTabId, { type: 'CANCEL_SYNC' });
+  } catch {
+    // Tab may have been closed — the content script will time out and send
+    // SYNC_COMPLETE anyway via its finally block.
   }
 });
 
 /**
- * Waits for background to confirm the sync completed.
- * Watches `lastSyncResult` (not `posts`) because onChanged won't fire for
- * `posts` when all scraped items are duplicates — but lastSyncResult always
- * has a fresh `at` timestamp so it fires every time.
+ * Watches storage for sync progress updates.
+ *
+ * Calls onPartial(result) for every SYNC_POSTS_PARTIAL batch so the UI can
+ * show a live counter. Resolves when the final SYNC_COMPLETE lands
+ * (partial: false). Rejects after 120 s.
  */
-function waitForSyncResult() {
+function watchSyncProgress(onPartial) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       chrome.storage.onChanged.removeListener(listener);
       reject(new Error('Sync timed out'));
-    }, 15_000);
+    }, 120_000);
 
     function listener(changes, area) {
       if (area !== 'local' || !changes.lastSyncResult) return;
-      clearTimeout(timeout);
-      chrome.storage.onChanged.removeListener(listener);
-      const { newCount, totalCount, warning } = changes.lastSyncResult.newValue;
-      resolve({ success: true, newCount, totalCount, warning });
+
+      const result = changes.lastSyncResult.newValue;
+
+      if (result.partial) {
+        onPartial(result);
+      } else {
+        clearTimeout(timeout);
+        chrome.storage.onChanged.removeListener(listener);
+        resolve(result);
+      }
     }
 
     chrome.storage.onChanged.addListener(listener);
@@ -256,11 +257,13 @@ function waitForSyncResult() {
 function setSyncing(active) {
   syncBtn.disabled = active;
   syncBtn.classList.toggle('loading', active);
+  document.body.classList.toggle('syncing', active);
 }
 
 function showStatus(msg, type = 'success') {
   statusMsg.textContent = msg;
   statusMsg.className   = `status-msg show ${type}`;
+  // Only auto-hide terminal states; progress updates replace themselves
   if (type === 'success') setTimeout(clearStatus, 3000);
 }
 

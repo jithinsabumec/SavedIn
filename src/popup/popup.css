@@ -46,6 +46,12 @@ body {
   flex-shrink: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .logo {
   font-size: 14px;
   font-weight: 600;
@@ -112,6 +118,43 @@ body {
   animation: spin 0.7s linear infinite;
 }
 
+/* Cancel button — hidden until body.syncing */
+.cancel-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 10px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.cancel-btn:hover {
+  color: var(--text);
+  border-color: #666;
+}
+
+body.syncing .cancel-btn {
+  display: block;
+}
+
+/* Sync hint — shown only while syncing */
+.sync-hint {
+  display: none;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 14px 6px;
+  flex-shrink: 0;
+}
+
+body.syncing .sync-hint {
+  display: block;
+}
+
 /* ── Search bar ── */
 .search-wrap {
   padding: 10px 14px 8px;
@@ -168,6 +211,11 @@ body {
 .status-msg.success {
   background: rgba(10, 102, 194, 0.15);
   color: #6ab3ff;
+}
+
+.status-msg.progress {
+  background: rgba(10, 102, 194, 0.08);
+  color: #7eaadd;
 }
 
 .status-msg.warning {
