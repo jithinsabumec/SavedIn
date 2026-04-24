@@ -2,7 +2,7 @@
   "name": "@savedin/convex",
   "type": "module",
   "dependencies": {
-    "@savedin/shared": "*",
+    "@savedin/shared": "file:../shared",
     "convex": "^1.29.1"
   }
 }

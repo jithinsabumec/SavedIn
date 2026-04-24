@@ -1,10 +1,13 @@
 # Cloudflare Pages — monorepo root
 #
-# In the Pages project (Git):
-#   Root directory:        (leave empty = this repo root)
-#   Build command:         npm run cf:pages:build
+# Git-connected Pages:
+#   Build command:          npm run cf:pages:build
 #   Build output directory: web/dist
-#   Deploy command:        (leave EMPTY — do not run "wrangler deploy"; that targets Workers and breaks with Vite 5)
+#   Deploy command:         (leave EMPTY — Pages uploads web/dist automatically)
+#
+# Do NOT use "wrangler deploy" here: that is for Workers and fails in this repo
+# (monorepo root detection and/or extension Vite 5 vs Workers+Vite integration).
+# Manual Pages upload from CI only: wrangler pages deploy web/dist --project-name=…
 #
 # Set VITE_* env vars in the Pages dashboard (Convex, Clerk, extension id).
 

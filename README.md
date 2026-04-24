@@ -43,10 +43,12 @@ pnpm build:web
 
 ## Cloudflare Pages (web dashboard)
 
-1. Create a **Pages** project connected to this Git repo (not a Worker with `wrangler deploy`).
+1. Create a **Pages** project connected to this Git repo (not a **Workers** build that runs `wrangler deploy`).
 2. **Root directory**: repository root (leave blank). **Build output directory**: `web/dist`.
-3. **Build command**: `npm run cf:pages:build` (uses `npm ci` + workspace web build; works on Cloudflare’s default npm).
-4. **Deploy command**: leave **empty**. If you set `npx wrangler deploy`, the build will fail (Workers + Vite 5 vs required Vite 6).
+3. **Build command**: `npm run cf:pages:build` (web only; faster than `npm run build`, which also builds the extension). Cloudflare may use **Bun** for `bun install` and **npm** for the build script; that combination is fine.
+4. **Deploy command**: leave **empty**. Pages publishes whatever is in **Build output directory** after the build; a deploy step is not required.
+   - **`npx wrangler deploy`** is wrong here: it targets a **Worker**, not Pages. From the monorepo root it can fail with *“run in the root of a workspace instead of targeting a specific project”*, or with a Vite version error for the extension.
+   - Only if you are **not** using Git-connected Pages and you deploy from CI with Wrangler manually, use **`npx wrangler pages deploy web/dist --project-name=<your-pages-project>`** (note **`pages deploy`**, not `deploy`), with `CLOUDFLARE_API_TOKEN` set.
 5. Add environment variables: `VITE_CONVEX_URL`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_EXTENSION_ID`.
 6. After deploy, set `VITE_WEB_APP_ORIGIN` in `extension/.env` to your `*.pages.dev` (or custom) URL and rebuild the extension.
 
