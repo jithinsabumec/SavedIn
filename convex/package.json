@@ -1,0 +1,8 @@
+{
+  "name": "@savedin/convex",
+  "type": "module",
+  "dependencies": {
+    "@savedin/shared": "*",
+    "convex": "^1.29.1"
+  }
+}

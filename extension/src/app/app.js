@@ -1,3 +1,5 @@
+import { buildHighlightedPreview, searchPosts } from '@savedin/shared';
+
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const MODEL_OPTIONS = [
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
@@ -470,77 +472,6 @@ function renderSearchResults(items) {
   }
 
   resultsList.appendChild(fragment);
-}
-
-/**
- * Case-insensitive substring search across postText and authorName.
- * Returns results with the exact byte ranges of every match in postText,
- * so highlights are always the complete query phrase — never scattered tokens.
- */
-function searchPosts(query, posts) {
-  const q = query.trim();
-  if (!q) return posts.map(p => ({ item: p, ranges: [] }));
-
-  const qLower  = q.toLowerCase();
-  const matched = [];
-
-  for (const post of posts) {
-    const textLower   = post.postText.toLowerCase();
-    const authorLower = post.authorName.toLowerCase();
-    if (!textLower.includes(qLower) && !authorLower.includes(qLower)) continue;
-
-    const ranges = [];
-    let idx = 0;
-    while ((idx = textLower.indexOf(qLower, idx)) !== -1) {
-      ranges.push([idx, idx + q.length - 1]);
-      idx += q.length;
-    }
-    matched.push({ item: post, ranges });
-  }
-
-  return matched;
-}
-
-/**
- * Returns an HTML snippet centred around the first match so the highlighted
- * term is always visible, even when it appears deep in a long post.
- * Falls back to the opening 300 chars when there are no match ranges
- * (semantic results have no exact matches to highlight).
- */
-function buildHighlightedPreview(text, ranges) {
-  const WINDOW = 300;
-  const PAD    = 80;
-
-  if (!ranges || ranges.length === 0) {
-    const preview = text.slice(0, WINDOW) + (text.length > WINDOW ? '…' : '');
-    return escapeHtml(preview);
-  }
-
-  const [firstStart]  = ranges[0];
-  const winStart      = Math.max(0, firstStart - PAD);
-  const winEnd        = winStart + WINDOW;
-  const excerpt       = text.slice(winStart, winEnd);
-  const leadEllipsis  = winStart > 0;
-  const trailEllipsis = winEnd < text.length;
-
-  const local = ranges
-    .map(([s, e]) => [s - winStart, e - winStart])
-    .filter(([s, e]) => e >= 0 && s < excerpt.length)
-    .map(([s, e]) => [Math.max(0, s), Math.min(e, excerpt.length - 1)]);
-
-  let html   = leadEllipsis ? '…' : '';
-  let cursor = 0;
-
-  for (const [start, end] of local) {
-    if (start > cursor) html += escapeHtml(excerpt.slice(cursor, start));
-    html   += `<mark>${escapeHtml(excerpt.slice(start, end + 1))}</mark>`;
-    cursor  = end + 1;
-  }
-
-  if (cursor < excerpt.length) html += escapeHtml(excerpt.slice(cursor));
-  if (trailEllipsis) html += '…';
-
-  return html;
 }
 
 function stripCitedPostsLine(text) {

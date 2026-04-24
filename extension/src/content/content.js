@@ -209,6 +209,10 @@
   const SCROLL_DELAY_MAX = 1200; // ms — maximum pause (random between min–max)
 
   async function main() {
+    /** First-install flow: after sync, background opens the SavedIn web app. */
+    const isSetup =
+      new URLSearchParams(window.location.search).get('savedin_setup') === 'true';
+
     const existingIds      = await getExistingIds();
     const seenThisSession  = new Set(existingIds);
     let   totalThisSession = 0;
@@ -275,6 +279,10 @@
       // Signal the popup that the sync is complete (even if we errored or cancelled)
       await safeSend({ type: 'SYNC_COMPLETE', totalThisSession });
 
+      if (isSetup) {
+        await safeSend({ type: 'OPEN_DASHBOARD' });
+      }
+
       // Return the user to the top of their saved posts
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -285,6 +293,9 @@
   main().catch((err) => {
     console.error('[SavedIn] Fatal error in main:', err);
     chrome.runtime.sendMessage({ type: 'SYNC_COMPLETE', totalThisSession: 0 }).catch(() => {});
+    if (isOnboarding) {
+      chrome.runtime.sendMessage({ type: 'OPEN_DASHBOARD' }).catch(() => {});
+    }
     window.__savedInSyncing = false;
   });
 

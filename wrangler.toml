@@ -1,0 +1,13 @@
+# Cloudflare Pages — monorepo root
+#
+# In the Pages project (Git):
+#   Root directory:        (leave empty = this repo root)
+#   Build command:         npm run cf:pages:build
+#   Build output directory: web/dist
+#   Deploy command:        (leave EMPTY — do not run "wrangler deploy"; that targets Workers and breaks with Vite 5)
+#
+# Set VITE_* env vars in the Pages dashboard (Convex, Clerk, extension id).
+
+name = "savedin-web"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "web/dist"

@@ -15,13 +15,13 @@
   --text: #f0f0f0;
   --text-muted: #888;
   --accent: #0A66C2;
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 6px;
+  --radius-sm: 4px;
 }
 
 body {
-  width: 320px;
-  height: 200px;
+  width: 300px;
+  height: 220px;
   background: var(--bg);
   color: var(--text);
   font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -33,7 +33,7 @@ body {
 }
 
 .header {
-  padding: 14px 16px 10px;
+  padding: 10px 14px 8px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -52,8 +52,9 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px 16px;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  min-height: 0;
 }
 
 .post-count {
@@ -67,8 +68,7 @@ body {
 }
 
 .sync-btn,
-.cancel-btn,
-.open-app-btn {
+.cancel-btn {
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 13px;
@@ -86,7 +86,7 @@ body {
   border: 1px solid var(--border-input);
   background: var(--surface);
   color: var(--text);
-  padding: 10px 12px;
+  padding: 8px 10px;
   position: relative;
 }
 
@@ -126,7 +126,7 @@ body {
   border: 1px solid var(--border-input);
   background: transparent;
   color: var(--text-muted);
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .cancel-btn:hover {
@@ -144,47 +144,99 @@ body.syncing .cancel-btn {
   display: none;
   font-size: 11px;
   color: var(--text-muted);
+  min-height: 14px;
+  line-height: 1.35;
 }
 
-body.syncing .sync-hint {
+body.syncing .sync-hint,
+.sync-hint.visible {
   display: block;
 }
 
-.sync-status {
-  min-height: 18px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.sync-status.success {
-  color: #6ab3ff;
-}
-
-.sync-status.progress {
-  color: #7eaadd;
-}
-
-.sync-status.warning {
+.sync-hint.warning {
   color: #e0a840;
 }
 
-.sync-status.error {
+.sync-hint.error {
   color: #f07070;
+}
+
+.sync-hint.success {
+  color: #6ab3ff;
+}
+
+.auth-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.auth-prompt {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.auth-signin {
+  align-self: flex-start;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.auth-signin:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.auth-email {
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+.auth-signout {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-signout:hover {
+  opacity: 0.85;
 }
 
 .open-app-btn {
   width: 100%;
   margin-top: auto;
-  padding: 11px 14px;
-  border: 1px solid rgba(10, 102, 194, 0.35);
-  background: rgba(10, 102, 194, 0.14);
-  color: var(--text);
-  font-weight: 600;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
 
 .open-app-btn:hover {
-  background: rgba(10, 102, 194, 0.22);
-  border-color: rgba(10, 102, 194, 0.5);
+  opacity: 0.9;
 }
 
 @keyframes spin {

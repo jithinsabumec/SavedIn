@@ -1,16 +1,21 @@
 {
   "name": "savedin",
-  "version": "1.0.0",
-  "description": "Search your LinkedIn saved posts locally in the browser",
+  "private": true,
+  "workspaces": [
+    "extension",
+    "web",
+    "convex",
+    "shared"
+  ],
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build"
-  },
-  "devDependencies": {
-    "vite": "^5.0.0"
+    "build": "npm run build -w @savedin/web && npm run build -w @savedin/extension",
+    "dev:extension": "pnpm --filter extension dev",
+    "build:extension": "pnpm --filter extension build",
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "npm run build -w @savedin/web",
+    "cf:pages:build": "npm run build:web"
   },
   "dependencies": {
-    "@xenova/transformers": "^2.17.2",
-    "fuse.js": "^7.0.0"
+    "convex": "^1.29.1"
   }
 }

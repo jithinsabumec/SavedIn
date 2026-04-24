@@ -27,16 +27,25 @@
           <polyline points="1 20 1 14 7 14"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
         </svg>
-        <span>Sync from LinkedIn</span>
+        <span>Sync</span>
       </button>
 
       <button class="cancel-btn" id="cancelBtn" aria-label="Cancel sync">Cancel</button>
     </div>
 
-    <p class="sync-hint" id="syncHint">Stay on the LinkedIn tab</p>
-    <p class="sync-status" id="syncStatus" aria-live="polite"></p>
+    <p class="sync-hint" id="syncHint">Stay on the LinkedIn tab while syncing</p>
 
-    <button class="open-app-btn" id="openAppBtn">Open SavedIn</button>
+    <section class="auth-section" id="authSectionSignedOut" hidden>
+      <p class="auth-prompt">Sign in to sync across devices</p>
+      <button type="button" class="auth-signin" id="signInBtn">Sign in</button>
+    </section>
+
+    <section class="auth-section" id="authSectionSignedIn" hidden>
+      <p class="auth-email" id="userEmailDisplay"></p>
+      <button type="button" class="auth-signout" id="signOutBtn">Sign out</button>
+    </section>
+
+    <button type="button" class="open-app-btn" id="openAppBtn">Open SavedIn</button>
   </main>
 
   <script type="module" src="popup.js"></script>

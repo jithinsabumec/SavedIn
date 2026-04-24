@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/chat.tsx","./src/components/search.tsx","./src/components/settings.tsx","./src/lib/embeddingclient.ts","./src/pages/landing.tsx","./src/pages/onboarding.tsx","./src/utils/cosinesimilarity.ts","./src/utils/mapconvexposts.ts","./src/workers/embedding.worker.ts"],"version":"5.9.3"}

@@ -1,0 +1,107 @@
+:root {
+  --bg: #0a0a0a;
+  --surface: #1a1a1a;
+  --surface-hover: #222222;
+  --border: #2a2a2a;
+  --border-input: #3a3a3a;
+  --text: #f0f0f0;
+  --text-muted: #888;
+  --accent: #0a66c2;
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+mark {
+  background: rgba(10, 102, 194, 0.35);
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.skeleton-text {
+  display: inline-block;
+  height: 10px;
+  width: 48px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    var(--surface-hover) 50%,
+    var(--surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: sk 1.2s ease-in-out infinite;
+}
+
+@keyframes sk {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(10, 102, 194, 0.45);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.pill-ai {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid rgba(10, 102, 194, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}

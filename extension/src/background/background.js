@@ -5,14 +5,24 @@
  *   SYNC_POSTS                        — legacy single-pass sync (kept for backwards compat)
  *   SYNC_POSTS_PARTIAL                — one batch from the auto-scroll loop; partial: true
  *   SYNC_COMPLETE                     — scroll loop finished; partial: false, final count
+ *   OPEN_DASHBOARD                    — first-install setup: open the SavedIn web app
  *   SEMANTIC_SEARCH                   — embed a query and rank stored posts by cosine similarity
  *   GENERATE_EMBEDDINGS_FOR_EXISTING  — backfill embeddings for posts synced before this feature
+ *
+ * External messages (hosted web app origin via `externally_connectable` + VITE_WEB_APP_ORIGIN at build):
+ *   AUTH_SUCCESS                      — Clerk Convex JWT + user info after web sign-in
  *
  * Port types handled:
  *   chat                              — streams chat completion chunks back to the app page
  */
 
 import { pipeline, env } from '@xenova/transformers';
+
+/** Convex deployment URL (injected at build time from extension/.env). */
+const CONVEX_URL = import.meta.env.VITE_CONVEX_URL ?? '';
+
+/** Hosted web dashboard origin only, e.g. `https://your-project.pages.dev` (from `VITE_WEB_APP_ORIGIN` at build). */
+const WEB_APP_ORIGIN = import.meta.env.VITE_WEB_APP_ORIGIN || '';
 
 env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('/');
 env.backends.onnx.wasm.proxy = false;
@@ -92,6 +102,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         .catch((error) => sendResponse({ success: false, error: error.message }));
       return true;
 
+    case 'OPEN_DASHBOARD':
+      if (WEB_APP_ORIGIN) {
+        chrome.tabs.create({ url: WEB_APP_ORIGIN });
+      } else {
+        console.warn('[SavedIn] OPEN_DASHBOARD skipped: set VITE_WEB_APP_ORIGIN when building the extension');
+      }
+      sendResponse({ success: true });
+      return true;
+
     case 'SEMANTIC_SEARCH':
       handleSemanticSearch(message.query)
         .then(sendResponse)
@@ -107,6 +126,64 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     default:
       return false;
   }
+});
+
+/**
+ * Hosted web app sends auth after Clerk sign-in so the extension can call Convex.
+ */
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (!WEB_APP_ORIGIN) {
+    sendResponse({ ok: false, error: 'extension_web_origin_not_configured' });
+    return false;
+  }
+
+  if (sender.origin !== WEB_APP_ORIGIN) {
+    sendResponse({ ok: false, error: 'invalid_origin' });
+    return false;
+  }
+
+  if (message?.type !== 'AUTH_SUCCESS') {
+    sendResponse({ ok: false, error: 'unknown_message' });
+    return false;
+  }
+
+  const { token, email, userId, tokenExpiresAt } = message;
+
+  if (typeof token !== 'string' || typeof userId !== 'string') {
+    sendResponse({ ok: false, error: 'invalid_payload' });
+    return false;
+  }
+
+  const toStore = {
+    authToken: token,
+    userEmail: typeof email === 'string' ? email : '',
+    clerkUserId: userId,
+  };
+
+  if (typeof tokenExpiresAt === 'number' && Number.isFinite(tokenExpiresAt)) {
+    toStore.authTokenExpiresAt = tokenExpiresAt;
+  }
+
+  chrome.storage.local
+    .set(toStore)
+    .then(() => {
+      sendResponse({ ok: true });
+      // Notify open extension UIs (e.g. popup) — internal message, not from the web.
+      chrome.runtime
+        .sendMessage({
+          type: 'AUTH_SUCCESS',
+          token,
+          email: toStore.userEmail,
+          userId,
+          tokenExpiresAt: toStore.authTokenExpiresAt,
+        })
+        .catch(() => {});
+    })
+    .catch((err) => {
+      sendResponse({ ok: false, error: err?.message ?? 'storage_failed' });
+    });
+
+  return true;
 });
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -140,7 +217,112 @@ async function mergePosts(incomingPosts) {
   const newPosts = incomingPosts.filter((post) => !existingIds.has(post.id));
   const merged = [...newPosts, ...existing];
   await chrome.storage.local.set({ posts: merged });
+
+  // Never block local sync — Convex runs in the background.
+  pushToConvex(newPosts).catch((err) => {
+    console.warn('[SavedIn] Convex push failed silently:', err?.message ?? err);
+  });
+
   return { newCount: newPosts.length, totalCount: merged.length, newPosts };
+}
+
+/**
+ * Read JWT `exp` (seconds since epoch) without verifying the signature — used only to skip
+ * obviously expired tokens before calling Convex.
+ */
+function readJwtExpSeconds(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const json = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.exp === 'number' ? json.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Push newly merged posts to Convex so the web dashboard updates in real time.
+ * Uses the Clerk-issued Convex JWT stored by the web app after sign-in.
+ */
+async function pushToConvex(newPosts) {
+  if (!newPosts.length) return;
+
+  if (!CONVEX_URL) {
+    console.log('[SavedIn] VITE_CONVEX_URL not set, skipping Convex sync');
+    return;
+  }
+
+  const stored = await chrome.storage.local.get(['clerkUserId', 'authToken', 'authTokenExpiresAt']);
+
+  if (!stored.clerkUserId || !stored.authToken) {
+    console.log('[SavedIn] Not signed in, skipping Convex sync');
+    return;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expFromJwt = readJwtExpSeconds(stored.authToken);
+  const expSec = typeof stored.authTokenExpiresAt === 'number'
+    ? Math.floor(stored.authTokenExpiresAt / 1000)
+    : expFromJwt;
+
+  // Refresh policy: if we cannot prove the token is still valid for ~2 minutes, skip the push.
+  if (expSec !== null && nowSec >= expSec - 120) {
+    console.log('[SavedIn] Convex auth token expired or near expiry; open SavedIn web to sign in again');
+    return;
+  }
+
+  const base = CONVEX_URL.replace(/\/$/, '');
+  const url = `${base}/api/mutation`;
+
+  const args = {
+    posts: newPosts.map((p) => ({
+      id: p.id,
+      postText: p.postText,
+      authorName: p.authorName,
+      authorHeadline: p.authorHeadline,
+      postUrl: p.postUrl,
+      savedDate: p.savedDate,
+      syncedAt: p.syncedAt,
+      embedding: p.embedding,
+    })),
+    userId: stored.clerkUserId,
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${stored.authToken}`,
+      },
+      body: JSON.stringify({
+        path: 'posts:upsertPosts',
+        format: 'json',
+        args,
+      }),
+    });
+
+    if (response.status === 401) {
+      console.warn('[SavedIn] Convex sync unauthorized (401); clearing stored auth');
+      await chrome.storage.local.remove(['authToken', 'authTokenExpiresAt', 'clerkUserId', 'userEmail']);
+      return;
+    }
+
+    if (!response.ok) {
+      console.warn('[SavedIn] Convex sync failed:', response.status);
+      return;
+    }
+
+    const result = await response.json();
+    if (result.status === 'success') {
+      console.log(`[SavedIn] Convex sync: ${result.value?.inserted ?? '?'} inserted`);
+    } else {
+      console.warn('[SavedIn] Convex sync error:', result.errorMessage ?? result);
+    }
+  } catch (err) {
+    console.warn('[SavedIn] Convex sync error:', err?.message ?? err);
+  }
 }
 
 /**
