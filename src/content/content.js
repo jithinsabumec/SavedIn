@@ -12,6 +12,16 @@
 (function () {
   'use strict';
 
+  const isOnboarding = new URLSearchParams(window.location.search)
+    .get('savedin_setup') === 'true';
+  const isManualTrigger = window.__savedInManualSyncTrigger === true;
+
+  if (!isOnboarding && !isManualTrigger) {
+    return;
+  }
+
+  window.__savedInManualSyncTrigger = false;
+
   // Guard against concurrent syncs if the user clicks Sync twice
   if (window.__savedInSyncing) {
     console.warn('[SavedIn] Sync already in progress — ignoring re-injection.');

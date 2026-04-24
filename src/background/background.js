@@ -35,6 +35,15 @@ const BACKFILL_PAUSE = 200;
 let embedder = null;
 let backfillPromise = null;
 
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason !== 'install') return;
+
+  chrome.storage.local.set({ isFirstInstall: true });
+  chrome.tabs.create({
+    url: 'https://www.linkedin.com/my-items/saved-posts/?savedin_setup=true',
+  });
+});
+
 async function getEmbedder() {
   if (!embedder) {
     embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');

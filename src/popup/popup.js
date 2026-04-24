@@ -15,10 +15,13 @@ const openAppBtn = document.getElementById('openAppBtn');
 
 let allPosts        = [];
 let activeSyncTabId = null;
+let onboardingEllipsisTimer = null;
+let onboardingStorageListener = null;
 
 async function init() {
   allPosts = await loadPosts();
   renderPostCount();
+  await initFirstInstallState();
 }
 
 async function loadPosts() {
@@ -41,7 +44,74 @@ chrome.storage.onChanged.addListener((changes, area) => {
   renderPostCount();
 });
 
+async function initFirstInstallState() {
+  const stored = await chrome.storage.local.get('isFirstInstall');
+  if (!stored.isFirstInstall) return;
+
+  updateFirstInstallStatus();
+
+  onboardingStorageListener = async (changes, area) => {
+    if (area !== 'local') return;
+
+    if (changes.posts) {
+      allPosts = (changes.posts.newValue ?? []).slice().sort((a, b) => new Date(b.syncedAt) - new Date(a.syncedAt));
+      renderPostCount();
+      await updateFirstInstallStatus();
+    }
+
+    if (changes.isFirstInstall && changes.isFirstInstall.newValue !== true) {
+      stopFirstInstallState();
+    }
+  };
+
+  chrome.storage.onChanged.addListener(onboardingStorageListener);
+}
+
+async function updateFirstInstallStatus() {
+  if (allPosts.length === 0) {
+    startOnboardingEllipsis();
+    return;
+  }
+
+  stopOnboardingEllipsis();
+  showStatus(`Welcome to SavedIn. ${allPosts.length} post${allPosts.length !== 1 ? 's' : ''} imported.`, 'success');
+  await chrome.storage.local.remove('isFirstInstall');
+  stopFirstInstallState();
+}
+
+function startOnboardingEllipsis() {
+  if (onboardingEllipsisTimer) return;
+
+  const frames = ['', '.', '..', '...'];
+  let frameIndex = 0;
+
+  const render = () => {
+    syncStatus.textContent = `Importing your LinkedIn posts${frames[frameIndex]}`;
+    syncStatus.className = 'sync-status progress';
+    frameIndex = (frameIndex + 1) % frames.length;
+  };
+
+  render();
+  onboardingEllipsisTimer = setInterval(render, 450);
+}
+
+function stopOnboardingEllipsis() {
+  if (!onboardingEllipsisTimer) return;
+  clearInterval(onboardingEllipsisTimer);
+  onboardingEllipsisTimer = null;
+}
+
+function stopFirstInstallState() {
+  stopOnboardingEllipsis();
+
+  if (onboardingStorageListener) {
+    chrome.storage.onChanged.removeListener(onboardingStorageListener);
+    onboardingStorageListener = null;
+  }
+}
+
 syncBtn.addEventListener('click', async () => {
+  stopOnboardingEllipsis();
   clearStatus();
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -57,6 +127,13 @@ syncBtn.addEventListener('click', async () => {
   try {
     const syncPromise = watchSyncProgress((partial) => {
       showStatus(`Scrolling... ${partial.totalThisSession} posts found`, 'progress');
+    });
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        window.__savedInManualSyncTrigger = true;
+      },
     });
 
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
@@ -137,6 +214,7 @@ function setSyncing(active) {
 }
 
 function showStatus(message, type = 'success') {
+  stopOnboardingEllipsis();
   syncStatus.textContent = message;
   syncStatus.className   = `sync-status ${type}`;
   if (type === 'success') setTimeout(clearStatus, 3000);
