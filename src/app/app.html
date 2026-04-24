@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SavedIn</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="logo">Saved<span>In</span></div>
+
+        <nav class="tab-nav" aria-label="SavedIn sections">
+          <button class="tab-btn active" data-tab="search" type="button">
+            <span class="tab-icon">⌕</span>
+            <span>Search</span>
+          </button>
+          <button class="tab-btn" data-tab="chat" type="button">
+            <span class="tab-icon">◌</span>
+            <span>Chat</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <section class="settings-section">
+          <button class="settings-toggle" id="settingsToggle" type="button" aria-expanded="false">
+            <span>Settings</span>
+            <span class="gear-icon" aria-hidden="true">⚙</span>
+          </button>
+
+          <div class="settings-panel" id="settingsPanel" hidden>
+            <label class="field">
+              <span class="field-label">Google AI Studio API key</span>
+              <input id="apiKeyInput" type="password" placeholder="AIza..." autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Model</span>
+              <select id="modelSelect"></select>
+            </label>
+
+            <button class="save-settings-btn" id="saveSettingsBtn" type="button">Save</button>
+            <p class="settings-help">Get a free key from Google AI Studio. Stored only in your browser.</p>
+          </div>
+        </section>
+
+        <p class="sidebar-status" id="sidebarStatus" aria-live="polite"></p>
+        <p class="sidebar-count" id="sidebarCount">0 posts synced</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="panel search-panel active" id="searchPanel">
+        <div class="search-header">
+          <input
+            id="searchInput"
+            class="search-input"
+            type="search"
+            placeholder="Search your saved posts..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="search-meta">
+            <p class="results-count" id="resultsCount">0 posts</p>
+            <p class="search-mode" id="searchMode">Text search</p>
+          </div>
+        </div>
+
+        <div class="results-list" id="resultsList">
+          <div class="empty-state" id="searchEmptyState">
+            <p class="empty-title">No posts found</p>
+            <p class="empty-copy">Try a different search term.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel chat-panel" id="chatPanel">
+        <div class="chat-header">
+          <h1>Chat with your saved posts</h1>
+          <button class="clear-chat-btn" id="clearChatBtn" type="button">Clear chat</button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-empty-state" id="chatEmptyState">
+            <p class="empty-title">Add your Google AI Studio API key in settings to use chat</p>
+            <p class="empty-copy">Use the sidebar settings area on the left to save it first.</p>
+            <p class="empty-arrow" aria-hidden="true">←</p>
+          </div>
+        </div>
+
+        <form class="chat-compose" id="chatForm">
+          <textarea
+            id="chatInput"
+            class="chat-input"
+            rows="3"
+            placeholder="Ask about your saved posts..."
+          ></textarea>
+          <button class="send-btn" id="sendBtn" type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

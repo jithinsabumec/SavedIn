@@ -7,12 +7,14 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-
-  <!-- ── Header ── -->
   <header class="header">
     <div class="logo">Saved<span>In</span></div>
-    <div class="header-actions">
-      <button class="cancel-btn" id="cancelBtn" aria-label="Cancel sync">Cancel</button>
+  </header>
+
+  <main class="popup-main">
+    <p class="post-count" id="postCount">0 posts synced</p>
+
+    <div class="sync-controls">
       <button
         class="sync-btn"
         id="syncBtn"
@@ -25,41 +27,17 @@
           <polyline points="1 20 1 14 7 14"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
         </svg>
+        <span>Sync from LinkedIn</span>
       </button>
+
+      <button class="cancel-btn" id="cancelBtn" aria-label="Cancel sync">Cancel</button>
     </div>
-  </header>
 
-  <!-- ── Search ── -->
-  <div class="search-wrap">
-    <input
-      type="search"
-      id="searchInput"
-      class="search-input"
-      placeholder="Search your saved posts…  ↵ for AI search"
-      autocomplete="off"
-      spellcheck="false"
-    />
-  </div>
+    <p class="sync-hint" id="syncHint">Stay on the LinkedIn tab</p>
+    <p class="sync-status" id="syncStatus" aria-live="polite"></p>
 
-  <!-- Search mode indicator: empty unless in semantic mode -->
-  <div class="search-mode" id="searchMode"></div>
-
-  <!-- ── Status bar ── -->
-  <div class="status-bar">
-    <span class="post-count" id="postCount"></span>
-    <span class="status-msg" id="statusMsg"></span>
-  </div>
-
-  <!-- Shown only while syncing -->
-  <div class="sync-hint" id="syncHint">Stay on the LinkedIn tab</div>
-
-  <!-- ── Results ── -->
-  <div class="results" id="results">
-    <div class="empty-state" id="emptyState">
-      <p>No posts found</p>
-      <p class="hint">Try a different search term</p>
-    </div>
-  </div>
+    <button class="open-app-btn" id="openAppBtn">Open SavedIn</button>
+  </main>
 
   <script type="module" src="popup.js"></script>
 </body>

@@ -22,6 +22,10 @@ function copyStaticPlugin() {
         copyFileSync(`icons/${icon}`, `dist/icons/${icon}`);
       }
 
+      // ── html entry points ────────────────────────────────────────────────
+      copyFileSync(resolve(__dirname, 'dist/src/popup/popup.html'), resolve(__dirname, 'dist/popup.html'));
+      copyFileSync(resolve(__dirname, 'dist/src/app/app.html'), resolve(__dirname, 'dist/app.html'));
+
       // ── onnxruntime WASM files ───────────────────────────────────────────
       const wasmSrc = resolve(__dirname, 'node_modules/onnxruntime-web/dist');
       try {
@@ -38,7 +42,7 @@ function copyStaticPlugin() {
 }
 
 export default defineConfig({
-  root:      'src/popup',
+  root:      '.',
   publicDir: false,
 
   build: {
@@ -50,6 +54,7 @@ export default defineConfig({
 
     rollupOptions: {
       input: {
+        app:        resolve(__dirname, 'src/app/app.html'),
         popup:      resolve(__dirname, 'src/popup/popup.html'),
         background: resolve(__dirname, 'src/background/background.js'),
         content:    resolve(__dirname, 'src/content/content.js'),
