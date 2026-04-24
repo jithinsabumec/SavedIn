@@ -43,14 +43,17 @@ pnpm build:web
 
 ## Cloudflare Pages (web dashboard)
 
-**If your build log ends with** `Executing user deploy command: npx wrangler deploy` **and then a Wrangler workspace error, that setting is wrong.** Open the project’s build configuration and **delete** `npx wrangler deploy`, or replace it with **`npm run deploy`** (this repo’s script runs `wrangler pages deploy web/dist`, not Worker `deploy`). For normal **Pages + Git**, the deploy field should be **empty** so Cloudflare publishes `web/dist` after the build.
+**Deploy command:** For **Pages + Git**, leave it **empty** so Cloudflare publishes **`web/dist`** after the build—no Wrangler step.
+
+- **`npx wrangler deploy`** is wrong (Workers, not Pages; monorepo root errors).
+- If you must fill the field, use **`npm run deploy`**: on Cloudflare Pages builds (`CF_PAGES=1`) it **no-ops** so you avoid duplicate uploads and **auth error 10000** from `CLOUDFLARE_API_TOKEN` lacking **Account → Cloudflare Pages → Edit**. Outside Pages (e.g. GitHub Actions), it runs `wrangler pages deploy web/dist`; use a token with **Pages → Edit** (and create the Pages project first, or pass `--project-name` via `FORCE_WRANGLER_PAGES_DEPLOY=1` plus a custom script).
 
 1. Create a **Pages** project connected to this Git repo (not a **Workers** build that runs `wrangler deploy`).
 2. **Root directory**: repository root (leave blank). **Build output directory**: `web/dist`.
 3. **Build command**: `npm run cf:pages:build` (web only; faster than `npm run build`, which also builds the extension). Cloudflare may use **Bun** for `bun install` and **npm** for the build script; that combination is fine.
 4. **Deploy command**: leave **empty** (recommended). Pages publishes whatever is in **Build output directory** after the build; a deploy step is not required.
    - **`npx wrangler deploy`** is wrong here: it targets a **Worker**, not Pages. From the monorepo root it fails with *“run in the root of a workspace…”* (or a Vite version error).
-   - If the UI will not let you clear the deploy field, set it to **`npm run deploy`** instead (runs `wrangler pages deploy web/dist` from this repo). You may need **`CLOUDFLARE_API_TOKEN`** (and sometimes **`--project-name`** — pass via your own wrapper script or Wrangler config). For Git-connected Pages, an empty deploy field is still preferred so you do not double-publish.
+   - If the UI will not let you clear the deploy field, use **`npm run deploy`**: on Pages (`CF_PAGES=1`) it skips Wrangler; elsewhere it runs **`wrangler pages deploy web/dist`** (needs a token with **Cloudflare Pages → Edit**). Prefer an empty deploy field on Pages to avoid confusion.
    - Manual CI only: **`npx wrangler pages deploy web/dist --project-name=<your-pages-project>`** with `CLOUDFLARE_API_TOKEN`.
 5. Add environment variables: `VITE_CONVEX_URL`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_EXTENSION_ID`.
 6. After deploy, set `VITE_WEB_APP_ORIGIN` in `extension/.env` to your `*.pages.dev` (or custom) URL and rebuild the extension.
