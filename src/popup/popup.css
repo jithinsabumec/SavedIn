@@ -182,6 +182,15 @@ body.syncing .sync-hint {
   border-color: var(--accent);
 }
 
+/* ── Search mode indicator ── */
+.search-mode {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 14px 6px;
+  min-height: 18px; /* prevents layout jump when label appears / disappears */
+  flex-shrink: 0;
+}
+
 /* ── Status bar (count + messages) ── */
 .status-bar {
   padding: 0 14px 8px;
@@ -266,7 +275,7 @@ body.syncing .sync-hint {
 
 .card-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 5px;
@@ -279,7 +288,27 @@ body.syncing .sync-hint {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  min-width: 0; /* allows ellipsis to work inside flex */
+}
+
+/* Groups the AI badge + open link on the right side of the card header */
+.card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* AI semantic match badge */
+.ai-match {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(10, 102, 194, 0.15);
+  color: var(--accent);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .open-link {

@@ -12,16 +12,14 @@
   <header class="header">
     <div class="logo">Saved<span>In</span></div>
     <div class="header-actions">
-      <!-- Shown only while syncing -->
       <button class="cancel-btn" id="cancelBtn" aria-label="Cancel sync">Cancel</button>
-      <!-- Sync icon button -->
       <button
         class="sync-btn"
         id="syncBtn"
         data-tooltip="Sync from LinkedIn"
         aria-label="Sync from LinkedIn"
       >
-        <svg id="syncIcon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"/>
           <polyline points="1 20 1 14 7 14"/>
@@ -37,11 +35,14 @@
       type="search"
       id="searchInput"
       class="search-input"
-      placeholder="Search your saved posts..."
+      placeholder="Search your saved posts…  ↵ for AI search"
       autocomplete="off"
       spellcheck="false"
     />
   </div>
+
+  <!-- Search mode indicator: empty unless in semantic mode -->
+  <div class="search-mode" id="searchMode"></div>
 
   <!-- ── Status bar ── -->
   <div class="status-bar">
@@ -49,7 +50,7 @@
     <span class="status-msg" id="statusMsg"></span>
   </div>
 
-  <!-- Shown only while syncing — reminds the user to stay on the LinkedIn tab -->
+  <!-- Shown only while syncing -->
   <div class="sync-hint" id="syncHint">Stay on the LinkedIn tab</div>
 
   <!-- ── Results ── -->

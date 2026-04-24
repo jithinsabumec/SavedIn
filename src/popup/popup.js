@@ -1,29 +1,38 @@
 /**
  * popup.js — SavedIn Popup UI
  *
- * Search uses plain case-insensitive substring matching so that multi-word
- * queries match as a complete phrase and highlights are always contiguous.
+ * Two search modes:
+ *   text     — keystroke-driven, instant, case-insensitive substring match
+ *   semantic — triggered by Enter, sends query to background for embedding + cosine ranking
  */
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const searchInput = document.getElementById('searchInput');
-const results     = document.getElementById('results');
-const emptyState  = document.getElementById('emptyState');
-const postCount   = document.getElementById('postCount');
-const statusMsg   = document.getElementById('statusMsg');
-const syncBtn     = document.getElementById('syncBtn');
-const cancelBtn   = document.getElementById('cancelBtn');
-const syncHint    = document.getElementById('syncHint');
+const searchInput  = document.getElementById('searchInput');
+const results      = document.getElementById('results');
+const emptyState   = document.getElementById('emptyState');
+const postCount    = document.getElementById('postCount');
+const statusMsg    = document.getElementById('statusMsg');
+const searchModeEl = document.getElementById('searchMode');
+const syncBtn      = document.getElementById('syncBtn');
+const cancelBtn    = document.getElementById('cancelBtn');
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let allPosts       = [];
-let activeSyncTabId = null;
+let allPosts            = [];
+let searchMode          = 'text';   // 'text' | 'semantic'
+let semanticPending     = false;
+let activeSyncTabId     = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   allPosts = await loadPosts();
   renderResults(searchPosts('', allPosts));
   searchInput.focus();
+
+  // Trigger silent backfill if any post is missing an embedding
+  if (allPosts.length > 0 && allPosts.some(p => !p.embedding)) {
+    chrome.runtime.sendMessage({ type: 'GENERATE_EMBEDDINGS_FOR_EXISTING' })
+      .catch(() => {}); // fire and forget — progress arrives via BACKFILL_PROGRESS messages
+  }
 }
 
 async function loadPosts() {
@@ -36,7 +45,17 @@ async function loadPosts() {
   });
 }
 
-// ── Search ────────────────────────────────────────────────────────────────────
+// ── Background message listener (backfill progress) ───────────────────────────
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type !== 'BACKFILL_PROGRESS') return;
+  if (message.done) {
+    showStatus('AI search ready', 'success');
+  } else {
+    showStatus(`Indexing for AI search… ${message.count} / ${message.total}`, 'progress');
+  }
+});
+
+// ── Text search (keystroke) ───────────────────────────────────────────────────
 
 /**
  * Case-insensitive substring search across postText and authorName.
@@ -45,7 +64,7 @@ async function loadPosts() {
  */
 function searchPosts(query, posts) {
   const q = query.trim();
-  if (!q) return posts.map((p) => ({ item: p, ranges: [] }));
+  if (!q) return posts.map(p => ({ item: p, ranges: [] }));
 
   const qLower  = q.toLowerCase();
   const matched = [];
@@ -53,20 +72,14 @@ function searchPosts(query, posts) {
   for (const post of posts) {
     const textLower   = post.postText.toLowerCase();
     const authorLower = post.authorName.toLowerCase();
-
-    const textMatch   = textLower.includes(qLower);
-    const authorMatch = authorLower.includes(qLower);
-    if (!textMatch && !authorMatch) continue;
+    if (!textLower.includes(qLower) && !authorLower.includes(qLower)) continue;
 
     const ranges = [];
-    if (textMatch) {
-      let idx = 0;
-      while ((idx = textLower.indexOf(qLower, idx)) !== -1) {
-        ranges.push([idx, idx + q.length - 1]);
-        idx += q.length;
-      }
+    let idx = 0;
+    while ((idx = textLower.indexOf(qLower, idx)) !== -1) {
+      ranges.push([idx, idx + q.length - 1]);
+      idx += q.length;
     }
-
     matched.push({ item: post, ranges });
   }
 
@@ -74,12 +87,69 @@ function searchPosts(query, posts) {
 }
 
 searchInput.addEventListener('input', () => {
+  // Any keystroke resets to text mode and clears semantic state
+  if (searchMode === 'semantic') {
+    searchMode = 'semantic-stale'; // keeps label until fully replaced
+  }
+  searchMode = 'text';
+  setModeLabel('');
   renderResults(searchPosts(searchInput.value, allPosts));
+});
+
+// ── Semantic search (Enter key) ───────────────────────────────────────────────
+searchInput.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  if (semanticPending) return;
+
+  const query = searchInput.value.trim();
+  if (!query) return;
+
+  semanticPending = true;
+  searchMode      = 'semantic';
+  showStatus('Searching by meaning…', 'progress');
+  setModeLabel('AI search · loading…');
+
+  try {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Semantic search timed out')), 30_000));
+
+    const response = await Promise.race([
+      chrome.runtime.sendMessage({ type: 'SEMANTIC_SEARCH', query }),
+      timeoutPromise,
+    ]);
+
+    clearStatus();
+
+    if (!response?.success) throw new Error(response?.error ?? 'Unknown error');
+
+    const items = response.results.map(post => ({ item: post, ranges: [], semantic: true }));
+    renderResults(items);
+
+    if (items.length === 0) {
+      setModeLabel('AI search · no matches (try a broader query or sync more posts)');
+    } else {
+      setModeLabel(`AI search · ${items.length} result${items.length !== 1 ? 's' : ''} by meaning · press any key for text search`);
+    }
+  } catch (err) {
+    clearStatus();
+    const isTimeout = err.message.includes('timed out');
+    showStatus(
+      isTimeout
+        ? 'AI model loading — try again in a moment'
+        : 'AI search unavailable — check background console',
+      'warning',
+    );
+    searchMode = 'text';
+    setModeLabel('');
+    console.error('[SavedIn] Semantic search error:', err);
+  } finally {
+    semanticPending = false;
+  }
 });
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderResults(items) {
-  results.querySelectorAll('.card').forEach((c) => c.remove());
+  results.querySelectorAll('.card').forEach(c => c.remove());
 
   const count    = items.length;
   const isSearch = searchInput.value.trim().length > 0;
@@ -99,14 +169,17 @@ function renderResults(items) {
 
   const fragment = document.createDocumentFragment();
 
-  for (const { item: post, ranges } of items) {
+  for (const { item: post, ranges, semantic } of items) {
     const preview = buildHighlightedPreview(post.postText, ranges);
     const card    = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="card-header">
         <span class="author-name">${escapeHtml(post.authorName)}</span>
-        <a class="open-link" href="${escapeHtml(post.postUrl)}" target="_blank" rel="noopener noreferrer">Open post ↗</a>
+        <div class="card-header-right">
+          ${semantic ? '<span class="ai-match">AI match</span>' : ''}
+          <a class="open-link" href="${escapeHtml(post.postUrl)}" target="_blank" rel="noopener noreferrer">Open post ↗</a>
+        </div>
       </div>
       ${post.authorHeadline ? `<div class="author-headline">${escapeHtml(post.authorHeadline)}</div>` : ''}
       <div class="post-preview">${preview}</div>
@@ -120,6 +193,8 @@ function renderResults(items) {
 /**
  * Returns an HTML snippet centred around the first match so the highlighted
  * term is always visible, even when it appears deep in a long post.
+ * Falls back to the opening 300 chars when there are no match ranges
+ * (semantic results have no exact matches to highlight).
  */
 function buildHighlightedPreview(text, ranges) {
   const WINDOW = 300;
@@ -130,12 +205,12 @@ function buildHighlightedPreview(text, ranges) {
     return escapeHtml(preview);
   }
 
-  const [firstStart]   = ranges[0];
-  const winStart       = Math.max(0, firstStart - PAD);
-  const winEnd         = winStart + WINDOW;
-  const excerpt        = text.slice(winStart, winEnd);
-  const leadEllipsis   = winStart > 0;
-  const trailEllipsis  = winEnd < text.length;
+  const [firstStart]  = ranges[0];
+  const winStart      = Math.max(0, firstStart - PAD);
+  const winEnd        = winStart + WINDOW;
+  const excerpt       = text.slice(winStart, winEnd);
+  const leadEllipsis  = winStart > 0;
+  const trailEllipsis = winEnd < text.length;
 
   const local = ranges
     .map(([s, e]) => [s - winStart, e - winStart])
@@ -180,15 +255,11 @@ syncBtn.addEventListener('click', async () => {
   setSyncing(true);
 
   try {
-    // Register listener BEFORE injecting — avoids missing a fast first partial.
     const syncPromise = watchSyncProgress((partial) => {
       showStatus(`Scrolling… ${partial.totalThisSession} posts found`, 'progress');
     });
 
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files:  ['content.js'],
-    });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
 
     const result = await syncPromise;
 
@@ -210,23 +281,15 @@ syncBtn.addEventListener('click', async () => {
   }
 });
 
-// Cancel button — sends CANCEL_SYNC to the content script on the LinkedIn tab
 cancelBtn.addEventListener('click', async () => {
   if (!activeSyncTabId) return;
-  try {
-    await chrome.tabs.sendMessage(activeSyncTabId, { type: 'CANCEL_SYNC' });
-  } catch {
-    // Tab may have been closed — the content script will time out and send
-    // SYNC_COMPLETE anyway via its finally block.
-  }
+  chrome.tabs.sendMessage(activeSyncTabId, { type: 'CANCEL_SYNC' }).catch(() => {});
 });
 
 /**
- * Watches storage for sync progress updates.
- *
- * Calls onPartial(result) for every SYNC_POSTS_PARTIAL batch so the UI can
- * show a live counter. Resolves when the final SYNC_COMPLETE lands
- * (partial: false). Rejects after 120 s.
+ * Watches storage for sync progress. Calls onPartial() for every partial batch
+ * and resolves when the final SYNC_COMPLETE arrives (partial: false).
+ * Timeout extended to 120s to allow for a full scroll-sync session.
  */
 function watchSyncProgress(onPartial) {
   return new Promise((resolve, reject) => {
@@ -237,9 +300,7 @@ function watchSyncProgress(onPartial) {
 
     function listener(changes, area) {
       if (area !== 'local' || !changes.lastSyncResult) return;
-
       const result = changes.lastSyncResult.newValue;
-
       if (result.partial) {
         onPartial(result);
       } else {
@@ -260,10 +321,13 @@ function setSyncing(active) {
   document.body.classList.toggle('syncing', active);
 }
 
+function setModeLabel(text) {
+  searchModeEl.textContent = text;
+}
+
 function showStatus(msg, type = 'success') {
   statusMsg.textContent = msg;
   statusMsg.className   = `status-msg show ${type}`;
-  // Only auto-hide terminal states; progress updates replace themselves
   if (type === 'success') setTimeout(clearStatus, 3000);
 }
 
