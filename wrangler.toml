@@ -7,7 +7,7 @@
 #
 # Do NOT use "wrangler deploy" here: that is for Workers and fails in this repo
 # (monorepo root detection and/or extension Vite 5 vs Workers+Vite integration).
-# If you cannot clear "Deploy command": npm run deploy (no-ops on Pages when CF_PAGES=1).
+# If you cannot clear "Deploy command": npm run deploy (no-op; no Wrangler). CI upload: npm run deploy:wrangler
 # Manual CI: wrangler pages deploy web/dist --project-name=…
 #
 # Set VITE_* env vars in the Pages dashboard (Convex, Clerk, extension id).

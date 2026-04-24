@@ -14,7 +14,8 @@
     "dev:web": "pnpm --filter web dev",
     "build:web": "npm run build -w @savedin/web",
     "cf:pages:build": "npm run build:web",
-    "deploy": "node scripts/cf-deploy.mjs"
+    "deploy": "node scripts/cf-deploy.mjs",
+    "deploy:wrangler": "node scripts/cf-deploy-wrangler.mjs"
   },
   "dependencies": {
     "convex": "^1.29.1"

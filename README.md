@@ -43,18 +43,18 @@ pnpm build:web
 
 ## Cloudflare Pages (web dashboard)
 
-**Deploy command:** For **Pages + Git**, leave it **empty** so Cloudflare publishes **`web/dist`** after the build—no Wrangler step.
+**Deploy command:** Prefer **empty** so the host publishes **`web/dist`** from the build output only once.
 
 - **`npx wrangler deploy`** is wrong (Workers, not Pages; monorepo root errors).
-- If you must fill the field, use **`npm run deploy`**: on Cloudflare Pages builds (`CF_PAGES=1`) it **no-ops** so you avoid duplicate uploads and **auth error 10000** from `CLOUDFLARE_API_TOKEN` lacking **Account → Cloudflare Pages → Edit**. Outside Pages (e.g. GitHub Actions), it runs `wrangler pages deploy web/dist`; use a token with **Pages → Edit** (and create the Pages project first, or pass `--project-name` via `FORCE_WRANGLER_PAGES_DEPLOY=1` plus a custom script).
+- If the UI requires a deploy step, use **`npm run deploy`**: it is a **no-op** (does not call Wrangler), so you avoid **auth error 10000** when `CLOUDFLARE_API_TOKEN` is not scoped for **Cloudflare Pages → Edit**. Your platform should still upload `web/dist` after a successful build.
+- To **force** a Wrangler Pages upload (e.g. GitHub Actions): **`npm run deploy:wrangler`** with a token that has **Account → Cloudflare Pages → Edit** and an existing Pages project (see `wrangler.toml` `name`).
 
 1. Create a **Pages** project connected to this Git repo (not a **Workers** build that runs `wrangler deploy`).
 2. **Root directory**: repository root (leave blank). **Build output directory**: `web/dist`.
 3. **Build command**: `npm run cf:pages:build` (web only; faster than `npm run build`, which also builds the extension). Cloudflare may use **Bun** for `bun install` and **npm** for the build script; that combination is fine.
 4. **Deploy command**: leave **empty** (recommended). Pages publishes whatever is in **Build output directory** after the build; a deploy step is not required.
    - **`npx wrangler deploy`** is wrong here: it targets a **Worker**, not Pages. From the monorepo root it fails with *“run in the root of a workspace…”* (or a Vite version error).
-   - If the UI will not let you clear the deploy field, use **`npm run deploy`**: on Pages (`CF_PAGES=1`) it skips Wrangler; elsewhere it runs **`wrangler pages deploy web/dist`** (needs a token with **Cloudflare Pages → Edit**). Prefer an empty deploy field on Pages to avoid confusion.
-   - Manual CI only: **`npx wrangler pages deploy web/dist --project-name=<your-pages-project>`** with `CLOUDFLARE_API_TOKEN`.
+   - If the UI will not let you clear the deploy field, use **`npm run deploy`** (no-op, no Wrangler). For a real Wrangler upload in CI, use **`npm run deploy:wrangler`** and a Pages-capable **`CLOUDFLARE_API_TOKEN`**.
 5. Add environment variables: `VITE_CONVEX_URL`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_EXTENSION_ID`.
 6. After deploy, set `VITE_WEB_APP_ORIGIN` in `extension/.env` to your `*.pages.dev` (or custom) URL and rebuild the extension.
 
