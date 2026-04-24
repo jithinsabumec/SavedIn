@@ -1,56 +1,63 @@
 // Cloudflare Pages Function: Clerk FAPI proxy
 // Routes /__clerk/* to Clerk's Frontend API
-// Bypasses the need for clerk.savedin.pages.dev CNAME (unverifiable on pages.dev)
+// Required headers per Clerk proxy docs: Clerk-Proxy-Url, Clerk-Secret-Key, X-Forwarded-For
+
+const PROXY_URL = 'https://savedin.pages.dev/__clerk';
+// Target: frontend-api.clerk.dev (per Clerk docs for satellite/proxy setup)
+const CLERK_FAPI = 'https://frontend-api.clerk.dev';
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
 
-  // Handle CORS preflight immediately
+  // Handle CORS preflight
   if (request.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: {
         'Access-Control-Allow-Origin': request.headers.get('Origin') || '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie, Clerk-Backend-Api-Url, X-Clerk-Auth-Reason',
+        'Access-Control-Allow-Headers': '*',
         'Access-Control-Allow-Credentials': 'true',
         'Access-Control-Max-Age': '86400',
       },
     });
   }
 
-  // Strip /__clerk prefix
+  // Strip /__clerk prefix and build target URL
   const proxyPath = url.pathname.replace(/^\/__clerk/, '') || '/';
-  const targetUrl = new URL(proxyPath + url.search, 'https://frontend-api.clerk.services');
+  const targetUrl = CLERK_FAPI + proxyPath + url.search;
 
-  // Build forwarded headers - let fetch() handle Host automatically
-  const forwardedHeaders = new Headers(request.headers);
-  forwardedHeaders.delete('host');
-  forwardedHeaders.delete('cf-connecting-ip');
-  forwardedHeaders.delete('cf-ipcountry');
-  forwardedHeaders.delete('cf-ray');
-  forwardedHeaders.delete('cf-visitor');
-  forwardedHeaders.delete('x-forwarded-for');
-  forwardedHeaders.delete('x-forwarded-proto');
+  // Build forwarded headers, removing Cloudflare-injected headers
+  const forwardHeaders = new Headers();
+  for (const [key, val] of request.headers.entries()) {
+    const k = key.toLowerCase();
+    if (['host', 'cf-ray', 'cf-visitor', 'cf-ipcountry', 'cf-connecting-ip'].includes(k)) continue;
+    forwardHeaders.set(key, val);
+  }
 
-  const upstreamResponse = await fetch(targetUrl.toString(), {
+  // Required Clerk proxy headers
+  forwardHeaders.set('Clerk-Proxy-Url', PROXY_URL);
+  forwardHeaders.set('X-Forwarded-For', request.headers.get('cf-connecting-ip') || '');
+  if (env.CLERK_SECRET_KEY) {
+    forwardHeaders.set('Clerk-Secret-Key', env.CLERK_SECRET_KEY);
+  }
+
+  const upstream = await fetch(targetUrl, {
     method: request.method,
-    headers: forwardedHeaders,
+    headers: forwardHeaders,
     body: ['GET', 'HEAD'].includes(request.method) ? null : request.body,
     redirect: 'follow',
   });
 
-  // Clone response with CORS headers added
-  const responseHeaders = new Headers(upstreamResponse.headers);
-  const origin = request.headers.get('Origin');
-  responseHeaders.set('Access-Control-Allow-Origin', origin || '*');
-  responseHeaders.set('Access-Control-Allow-Credentials', 'true');
-  responseHeaders.set('Vary', 'Origin');
+  const respHeaders = new Headers(upstream.headers);
+  respHeaders.set('Access-Control-Allow-Origin', request.headers.get('Origin') || '*');
+  respHeaders.set('Access-Control-Allow-Credentials', 'true');
+  respHeaders.set('Vary', 'Origin');
 
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
-    headers: responseHeaders,
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: respHeaders,
   });
 }
