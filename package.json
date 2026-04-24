@@ -13,9 +13,13 @@
     "build:extension": "pnpm --filter extension build",
     "dev:web": "pnpm --filter web dev",
     "build:web": "npm run build -w @savedin/web",
-    "cf:pages:build": "npm run build:web"
+    "cf:pages:build": "npm run build:web",
+    "deploy": "wrangler pages deploy web/dist"
   },
   "dependencies": {
     "convex": "^1.29.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.85.0"
   }
 }
