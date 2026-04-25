@@ -1,10 +1,9 @@
 // Cloudflare Pages Function: Clerk FAPI proxy
-// Routes /__clerk/* to Clerk's Frontend API
-// Required headers per Clerk proxy docs: Clerk-Proxy-Url, Clerk-Secret-Key, X-Forwarded-For
+// Routes /__clerk/* to Clerk's production Frontend API
+// Uses Cloudflare fetch cf options to handle SSL compatibility
 
 const PROXY_URL = 'https://savedin.pages.dev/__clerk';
-// Target: frontend-api.clerk.dev (per Clerk docs for satellite/proxy setup)
-const CLERK_FAPI = 'https://frontend-api.clerk.dev';
+const CLERK_FAPI = 'https://frontend-api.clerk.services';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -28,17 +27,21 @@ export async function onRequest(context) {
   const proxyPath = url.pathname.replace(/^\/__clerk/, '') || '/';
   const targetUrl = CLERK_FAPI + proxyPath + url.search;
 
-  // Build forwarded headers, removing Cloudflare-injected headers
+  // Build forwarded headers
   const forwardHeaders = new Headers();
   for (const [key, val] of request.headers.entries()) {
     const k = key.toLowerCase();
-    if (['host', 'cf-ray', 'cf-visitor', 'cf-ipcountry', 'cf-connecting-ip'].includes(k)) continue;
+    // Strip Cloudflare-injected headers to avoid conflicts
+    if (['host', 'cf-ray', 'cf-visitor', 'cf-ipcountry', 'cf-connecting-ip',
+         'x-real-ip', 'x-forwarded-host'].includes(k)) continue;
     forwardHeaders.set(key, val);
   }
 
-  // Required Clerk proxy headers
+  // Required Clerk proxy headers per docs
   forwardHeaders.set('Clerk-Proxy-Url', PROXY_URL);
-  forwardHeaders.set('X-Forwarded-For', request.headers.get('cf-connecting-ip') || '');
+  forwardHeaders.set('X-Forwarded-For',
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-forwarded-for') || '');
   if (env.CLERK_SECRET_KEY) {
     forwardHeaders.set('Clerk-Secret-Key', env.CLERK_SECRET_KEY);
   }
@@ -48,6 +51,10 @@ export async function onRequest(context) {
     headers: forwardHeaders,
     body: ['GET', 'HEAD'].includes(request.method) ? null : request.body,
     redirect: 'follow',
+    // Cloudflare Workers cf options for SSL compatibility
+    cf: {
+      minTlsVersion: '1.0',
+    },
   });
 
   const respHeaders = new Headers(upstream.headers);
